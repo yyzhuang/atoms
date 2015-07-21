@@ -118,6 +118,9 @@ class atoms_of_confusion:
     divisortype = type_int_or_float(divisor)
 
     if dividendtype is int and divisortype is int:
+      if int(dividend) % int(divisor) == 0:
+        raise ValueError("There is no ArithmeticTypeAtom!")
+      
       line = ''
       for head in statementhead:
         line = line + str(head)
@@ -131,6 +134,54 @@ class atoms_of_confusion:
     self.programtextlist[linenumber] = line
 
 
+    
+  # for code such as "double a = 1;" will convert 1 to 1.0000
+  # we should transform the code to "double a = (double) 1;"
+  def convert_TYPE_atom(self, linenumber):
+    assert(type(linenumber) is int or type(linenumber) is long)
+    if linenumber < 0:
+      raise ValueError("ArithmeticTypeAtom requires a positive line number")
+
+    if linenumber >= len(self.programtextlist):
+      raise ValueError("ArithmeticTypeAtom requires a line number (" + str(linenumber) 
+            + ") less than the number of lines in the file (" + str(len(self.programtextlist)) + ")")
+
+    programline = self.programtextlist[linenumber]
+    if '=' not in programline:
+      raise ValueError("ConvertTypeAtom requires an assignment operation")
+
+    # split "double a = 1;" to ["double a", "1;"]
+    # or split "a = 1;" to ["a", "1;"]
+    variable, value = programline.split('=')
+    value = value.replace(';', '').strip()
+    valuetype = type_int_or_float(value).__name__  
+
+    # split "double a" to ["double", "a"] or just ["a"]
+    itemlist = variable.split()
+    
+    if len(itemlist) == 1:
+      # "a = 1;": we need to find the type of a
+      variablename =  itemlist[0]
+      linenum = 0; 
+      endings = [';', ',']
+      while linenum < linenumber:
+        line = self.programtextlist[linenum]
+        for ending in endings:
+          pattern = variablename + ending
+          if line.find(pattern, 0) is not -1:
+            # we found the definition of variable, such as "double a;"
+            variabletype = line.split()[0]
+        linenum = linenum + 1        
+    else:
+      # "double a = 1;"
+      variabletype, variablename =  itemlist[0], itemlist[1]  
+
+    if variabletype == valuetype:
+      raise ValueError("ConvertTypeAtom requires an assignment operation")
+      
+    self.programtextlist[linenumber] = variable + ' = (' + variabletype + \
+                                         ') ' + value + ';'
+    
     
 def type_int_or_float(number):
   # number is a string. return the type of number represents
